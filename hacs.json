@@ -1,0 +1,6 @@
+{
+  "name": "Dometic AC BLE",
+  "content_in_root": false,
+  "domains": ["dometic_ac"],
+  "homeassistant": "2026.2.0"
+}
