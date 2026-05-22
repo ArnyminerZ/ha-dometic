@@ -4,9 +4,9 @@
     "step": {
       "user": {
         "title": "Configure Dometic AC",
-        "description": "Select a discovered Dometic AC device. You can also choose a specific Bluetooth proxy or keep it on automatic.",
+        "description": "Choose a detected Dometic AC device from the list. If none are detected yet, you can still enter the MAC manually.",
         "data": {
-          "address": "Device MAC Address",
+          "address": "Detected Device / MAC Address",
           "name": "Name",
           "bluetooth_source": "Bluetooth proxy"
         }

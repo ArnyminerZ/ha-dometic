@@ -2,6 +2,7 @@ import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.components.bluetooth import BluetoothServiceInfoBleak, async_discovered_service_info
 from homeassistant.const import CONF_ADDRESS, CONF_NAME
+from homeassistant.helpers import selector
 
 from .const import (
     CONF_BLUETOOTH_SOURCE,
@@ -30,6 +31,26 @@ def _source_options_from_service_infos(
             options[source] = source
     return options
 
+
+def _discover_matching_service_infos(
+    hass,
+) -> list[BluetoothServiceInfoBleak]:
+    """Return matching discoveries from both connectable and non-connectable caches."""
+    best_by_address: dict[str, BluetoothServiceInfoBleak] = {}
+    for connectable in (True, False):
+        for service_info in async_discovered_service_info(hass, connectable=connectable):
+            if not _matches_service_uuid(service_info):
+                continue
+            current = best_by_address.get(service_info.address)
+            if current is None:
+                best_by_address[service_info.address] = service_info
+                continue
+            current_rssi = current.rssi if current.rssi is not None else -999
+            new_rssi = service_info.rssi if service_info.rssi is not None else -999
+            if new_rssi > current_rssi:
+                best_by_address[service_info.address] = service_info
+    return list(best_by_address.values())
+
 class DometicACConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle a config flow for Dometic AC BLE."""
     
@@ -42,11 +63,7 @@ class DometicACConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     async def async_step_user(self, user_input=None):
         """Handle a flow initiated by the user."""
         errors = {}
-        discovered = [
-            dev
-            for dev in async_discovered_service_info(self.hass, connectable=True)
-            if _matches_service_uuid(dev)
-        ]
+        discovered = _discover_matching_service_infos(self.hass)
         self._discovered_devices = {}
 
         for dev in discovered:
@@ -72,8 +89,18 @@ class DometicACConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         if self._discovered_devices:
             source_options = _source_options_from_service_infos(discovered)
+            address_options = [
+                selector.SelectOptionDict(value=address, label=label)
+                for address, label in sorted(self._discovered_devices.items(), key=lambda item: item[1])
+            ]
             schema = vol.Schema({
-                vol.Required(CONF_ADDRESS): vol.In(self._discovered_devices),
+                vol.Required(CONF_ADDRESS): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=address_options,
+                        mode=selector.SelectSelectorMode.DROPDOWN,
+                        custom_value=False,
+                    )
+                ),
                 vol.Optional(CONF_NAME, default="Dometic AC"): str,
                 vol.Optional(CONF_BLUETOOTH_SOURCE, default=SOURCE_AUTO): vol.In(source_options),
             })
@@ -176,7 +203,7 @@ class DometicACOptionsFlow(config_entries.OptionsFlow):
 
         service_infos = [
             dev
-            for dev in async_discovered_service_info(self.hass, connectable=True)
+            for dev in _discover_matching_service_infos(self.hass)
             if dev.address == address and _matches_service_uuid(dev)
         ]
 
