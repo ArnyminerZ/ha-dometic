@@ -17,3 +17,7 @@ REG_LIGHT_POWER = 0x05
 REG_LIGHT_BRIGHTNESS = 0x06
 REG_ACTUAL_TEMP = 0x0A
 REG_SLEEP_MODE = 0x1B
+
+# Optional Bluetooth scanner source selection
+CONF_BLUETOOTH_SOURCE = "bluetooth_source"
+SOURCE_AUTO = "__auto__"

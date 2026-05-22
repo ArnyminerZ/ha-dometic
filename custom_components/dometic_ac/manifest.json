@@ -3,6 +3,12 @@
   "name": "Dometic AC BLE",
   "codeowners": [],
   "config_flow": true,
+  "bluetooth": [
+    {
+      "service_uuid": "537a0400-0995-481f-926c-1604e23fd515",
+      "connectable": true
+    }
+  ],
   "dependencies": ["bluetooth"],
   "documentation": "https://github.com/arnyminerz/ha-dometic",
   "integration_type": "device",

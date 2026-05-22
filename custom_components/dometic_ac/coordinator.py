@@ -27,11 +27,18 @@ from .const import (
 class DometicACDevice:
     """Connection manager for the Dometic AC BLE device."""
 
-    def __init__(self, hass: HomeAssistant, address: str, name: str) -> None:
+    def __init__(
+        self,
+        hass: HomeAssistant,
+        address: str,
+        name: str,
+        bluetooth_source: str | None = None,
+    ) -> None:
         """Initialize the Dometic AC BLE device manager."""
         self.hass = hass
         self.address = address
         self.name = name
+        self.bluetooth_source = bluetooth_source
         self._client: BleakClient | None = None
         self._connected = False
         self._lock = asyncio.Lock()
@@ -48,6 +55,26 @@ class DometicACDevice:
         self.light_power = False
         self.light_brightness = 100
         self.sleep_mode = False
+
+    def _ble_device_from_selected_source(self):
+        """Return BLEDevice from selected source, if configured and available."""
+        if not self.bluetooth_source:
+            return bluetooth.async_ble_device_from_address(
+                self.hass,
+                self.address,
+                connectable=True,
+            )
+
+        scanner_devices = bluetooth.async_scanner_devices_by_address(
+            self.hass,
+            self.address,
+            connectable=True,
+        )
+        for scanner_device in scanner_devices:
+            scanner = scanner_device.scanner
+            if scanner.source == self.bluetooth_source:
+                return scanner_device.ble_device
+        return None
 
     def register_listener(self, listener) -> None:
         """Register entity callback."""
@@ -104,9 +131,19 @@ class DometicACDevice:
         while self._is_active:
             if not self._connected:
                 LOGGER.debug("Attempting to connect to Dometic AC at %s", self.address)
-                ble_device = bluetooth.async_ble_device_from_address(self.hass, self.address)
+                ble_device = self._ble_device_from_selected_source()
                 if ble_device is None:
-                    LOGGER.debug("Device not found by bluetooth scanner, waiting %s seconds", retry_delay)
+                    if self.bluetooth_source:
+                        LOGGER.debug(
+                            "Device not visible on selected source %s, waiting %s seconds",
+                            self.bluetooth_source,
+                            retry_delay,
+                        )
+                    else:
+                        LOGGER.debug(
+                            "Device not found by bluetooth scanner, waiting %s seconds",
+                            retry_delay,
+                        )
                     await asyncio.sleep(retry_delay)
                     retry_delay = min(retry_delay * 2, 60.0)
                     continue
@@ -123,13 +160,18 @@ class DometicACDevice:
                     service_info = bluetooth.async_last_service_info(self.hass, self.address, connectable=True)
                     if service_info:
                         LOGGER.info(
-                            "Connecting to Dometic AC at %s (RSSI: %s, Adapter: %s)",
+                            "Connecting to Dometic AC at %s (RSSI: %s, Adapter: %s, Selected source: %s)",
                             self.address,
                             service_info.rssi,
                             service_info.source,
+                            self.bluetooth_source or "auto",
                         )
                     else:
-                        LOGGER.info("Connecting to Dometic AC at %s (no advertising info cached)", self.address)
+                        LOGGER.info(
+                            "Connecting to Dometic AC at %s (no advertising info cached, Selected source: %s)",
+                            self.address,
+                            self.bluetooth_source or "auto",
+                        )
 
                     client = await establish_connection(
                         BleakClientWithServiceCache,

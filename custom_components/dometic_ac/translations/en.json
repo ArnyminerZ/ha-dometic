@@ -4,19 +4,35 @@
     "step": {
       "user": {
         "title": "Configure Dometic AC",
-        "description": "Please select your Dometic AC device or enter its MAC address manually.",
+        "description": "Select a discovered Dometic AC device. You can also choose a specific Bluetooth proxy or keep it on automatic.",
         "data": {
           "address": "Device MAC Address",
-          "name": "Name"
+          "name": "Name",
+          "bluetooth_source": "Bluetooth proxy"
         }
       },
       "bluetooth_confirm": {
         "title": "Set up Dometic AC",
-        "description": "Do you want to set up {name} ({address})?"
+        "description": "Do you want to set up {name} ({address})?",
+        "data": {
+          "bluetooth_source": "Bluetooth proxy"
+        }
+      }
+    },
+    "options": {
+      "step": {
+        "init": {
+          "title": "Dometic AC options",
+          "description": "Choose which Bluetooth proxy to use for the connection.",
+          "data": {
+            "bluetooth_source": "Bluetooth proxy"
+          }
+        }
       }
     },
     "abort": {
-      "already_configured": "Device is already configured"
+      "already_configured": "Device is already configured",
+      "not_supported": "This Bluetooth device is not supported"
     }
   }
 }
