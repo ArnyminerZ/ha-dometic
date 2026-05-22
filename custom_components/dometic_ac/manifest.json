@@ -1,0 +1,12 @@
+{
+  "domain": "dometic_ac",
+  "name": "Dometic AC BLE",
+  "codeowners": [],
+  "config_flow": true,
+  "dependencies": ["bluetooth"],
+  "documentation": "https://github.com/arnyminerz/ha-dometic",
+  "integration_type": "device",
+  "iot_class": "local_polling",
+  "requirements": ["bleak-retry-connector>=3.0.0"],
+  "version": "1.0.0"
+}
