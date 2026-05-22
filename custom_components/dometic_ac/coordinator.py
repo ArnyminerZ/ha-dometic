@@ -1,7 +1,11 @@
 import asyncio
 from bleak import BleakClient
 from bleak.exc import BleakError
-from bleak_retry_connector import establish_connection, BleakClientWithServiceCache
+from bleak_retry_connector import (
+    establish_connection,
+    BleakClientWithServiceCache,
+    close_stale_connections_by_address,
+)
 
 from homeassistant.components import bluetooth
 from homeassistant.core import HomeAssistant
@@ -108,6 +112,25 @@ class DometicACDevice:
                     continue
 
                 try:
+                    # Close any stale/dangling connections for this device in BlueZ
+                    LOGGER.debug("Closing stale connections for %s", self.address)
+                    await close_stale_connections_by_address(self.address)
+                except Exception as err:
+                    LOGGER.warning("Failed to close stale connections for %s: %s", self.address, err)
+
+                try:
+                    # Retrieve and log RSSI/Source info for connection diagnostics
+                    service_info = bluetooth.async_last_service_info(self.hass, self.address, connectable=True)
+                    if service_info:
+                        LOGGER.info(
+                            "Connecting to Dometic AC at %s (RSSI: %s, Adapter: %s)",
+                            self.address,
+                            service_info.rssi,
+                            service_info.source,
+                        )
+                    else:
+                        LOGGER.info("Connecting to Dometic AC at %s (no advertising info cached)", self.address)
+
                     client = await establish_connection(
                         BleakClientWithServiceCache,
                         ble_device,
