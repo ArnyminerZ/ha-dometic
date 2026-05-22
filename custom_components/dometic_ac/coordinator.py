@@ -123,7 +123,8 @@ class DometicACDevice:
         LOGGER.info("Dometic AC disconnected unexpectedly")
         self._connected = False
         self._client = None
-        self._notify_listeners()
+        # Schedule notify on the event loop — callback may arrive from a background thread
+        self.hass.loop.call_soon_threadsafe(self._notify_listeners)
 
     async def _connection_loop(self) -> None:
         """Main connection and polling loop."""
@@ -152,6 +153,8 @@ class DometicACDevice:
                     # Close any stale/dangling connections for this device in BlueZ
                     LOGGER.debug("Closing stale connections for %s", self.address)
                     await close_stale_connections_by_address(self.address)
+                    # Brief pause so BlueZ finishes tearing down the stale connection
+                    await asyncio.sleep(1.0)
                 except Exception as err:
                     LOGGER.warning("Failed to close stale connections for %s: %s", self.address, err)
 
@@ -173,12 +176,16 @@ class DometicACDevice:
                             self.bluetooth_source or "auto",
                         )
 
+                    def _fresh_ble_device():
+                        return self._ble_device_from_selected_source() or ble_device
+
                     client = await establish_connection(
                         BleakClientWithServiceCache,
                         ble_device,
                         name=self.name,
                         disconnected_callback=self._disconnected_callback,
-                        max_attempts=3
+                        max_attempts=3,
+                        ble_device_callback=_fresh_ble_device,
                     )
                     self._client = client
                     self._connected = True

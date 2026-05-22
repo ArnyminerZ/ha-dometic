@@ -7,6 +7,11 @@
     {
       "service_uuid": "537a0400-0995-481f-926c-1604e23fd515",
       "connectable": true
+    },
+    {
+      "manufacturer_id": 2117,
+      "manufacturer_data_start": [4, 224, 140],
+      "connectable": true
     }
   ],
   "dependencies": ["bluetooth"],

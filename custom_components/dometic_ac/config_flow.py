@@ -7,6 +7,8 @@ from homeassistant.helpers import selector
 from .const import (
     CONF_BLUETOOTH_SOURCE,
     DOMAIN,
+    MANUFACTURER_DATA_PREFIX,
+    MANUFACTURER_ID,
     SERVICE_UUID,
     SOURCE_AUTO,
 )
@@ -18,6 +20,20 @@ def _matches_service_uuid(service_info: BluetoothServiceInfoBleak) -> bool:
         uuid.lower() for uuid in (service_info.advertisement.service_uuids or [])
     }
     return SERVICE_UUID.lower() in advertised
+
+
+def _matches_manufacturer_data(service_info: BluetoothServiceInfoBleak) -> bool:
+    """Return True if advertisement includes known Dometic manufacturer signature."""
+    manufacturer_data = service_info.advertisement.manufacturer_data or {}
+    payload = manufacturer_data.get(MANUFACTURER_ID)
+    if payload is None:
+        return False
+    return payload.startswith(MANUFACTURER_DATA_PREFIX)
+
+
+def _is_supported_advertisement(service_info: BluetoothServiceInfoBleak) -> bool:
+    """Return True when advertisement matches known Dometic signatures."""
+    return _matches_service_uuid(service_info) or _matches_manufacturer_data(service_info)
 
 
 def _source_options_from_service_infos(
@@ -39,7 +55,7 @@ def _discover_matching_service_infos(
     best_by_address: dict[str, BluetoothServiceInfoBleak] = {}
     for connectable in (True, False):
         for service_info in async_discovered_service_info(hass, connectable=connectable):
-            if not _matches_service_uuid(service_info):
+            if not _is_supported_advertisement(service_info):
                 continue
             current = best_by_address.get(service_info.address)
             if current is None:
@@ -121,7 +137,7 @@ class DometicACConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     async def async_step_bluetooth(self, discovery_info: BluetoothServiceInfoBleak):
         """Handle bluetooth discovery."""
-        if not _matches_service_uuid(discovery_info):
+        if not _is_supported_advertisement(discovery_info):
             return self.async_abort(reason="not_supported")
 
         address = discovery_info.address
@@ -204,7 +220,7 @@ class DometicACOptionsFlow(config_entries.OptionsFlow):
         service_infos = [
             dev
             for dev in _discover_matching_service_infos(self.hass)
-            if dev.address == address and _matches_service_uuid(dev)
+            if dev.address == address and _is_supported_advertisement(dev)
         ]
 
         source_options = _source_options_from_service_infos(service_infos)
