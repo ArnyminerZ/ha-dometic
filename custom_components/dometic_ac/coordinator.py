@@ -10,6 +10,7 @@ from bleak_retry_connector import (
 from homeassistant.components import bluetooth
 from homeassistant.core import HomeAssistant
 
+from .ble_agent import ensure_bluez_agent
 from .const import (
     LOGGER,
     NOTIFY_CHAR_UUID,
@@ -176,6 +177,10 @@ class DometicACDevice:
                             self.bluetooth_source or "auto",
                         )
 
+                    # Ensure a NoInputNoOutput BlueZ agent is registered so that the
+                    # device's Just Works pairing request is auto-accepted by BlueZ.
+                    await ensure_bluez_agent()
+
                     def _fresh_ble_device():
                         return self._ble_device_from_selected_source() or ble_device
 
@@ -187,14 +192,24 @@ class DometicACDevice:
                         max_attempts=3,
                         ble_device_callback=_fresh_ble_device,
                     )
+
+                    # Pair/bond the device — required for the encrypted GATT session.
+                    # "Just Works" means no PIN/passkey; our agent auto-confirms it.
+                    try:
+                        await client.pair()
+                        LOGGER.debug("Paired with Dometic AC at %s", self.address)
+                    except Exception as pair_err:
+                        # "Already paired" or equivalent is fine; log and continue.
+                        LOGGER.debug("Pairing note for %s: %s", self.address, pair_err)
+
                     self._client = client
                     self._connected = True
                     retry_delay = 5.0  # Reset retry delay
                     LOGGER.info("Connected to Dometic AC at %s", self.address)
-                    
+
                     # Start notifications
                     await client.start_notify(NOTIFY_CHAR_UUID, self._notification_handler)
-                    
+
                     # Initial state poll
                     await self.poll_all()
                     
